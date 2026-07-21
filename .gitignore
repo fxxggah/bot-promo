@@ -1,0 +1,10 @@
+# Ambiente Virtual e Configurações
+.env
+
+# Sessões do Telegram
+sessao_botpromo.session
+sessao_botpromo.session-journal
+
+# Pastas de Cache e Navegador do Playwright
+__pycache__/
+playwright_session/

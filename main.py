@@ -1,9 +1,13 @@
 import os
 import re
 import asyncio
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 from telethon import TelegramClient, events
 from ml_service import MercadoLivreService
+from shopee_service import ShopeeService
+from amazon_service import AmazonService
+from aliexpress_service import AliExpressService
 
 # Carrega as variáveis do arquivo .env
 load_dotenv()
@@ -20,49 +24,66 @@ CANAIS_ORIGEM = []
 for item in CANAL_ORIGEM_RAW.split(","):
     canal = item.strip()
     if canal:
-        # Tenta converter para inteiro se for ID numérico (ex: -100123456789)
         try:
             CANAIS_ORIGEM.append(int(canal))
         except ValueError:
             CANAIS_ORIGEM.append(canal)
 
-# Inicializa o serviço do ML e o Cliente do Telegram
+# Inicializa os serviços e o Cliente do Telegram
 ml_service = MercadoLivreService()
+shopee_service = ShopeeService()
+amazon_service = AmazonService()
+aliexpress_service = AliExpressService()
 client = TelegramClient("sessao_botpromo", API_ID, API_HASH)
 
-# Regex para identificar links do Mercado Livre
-REGEX_ML = r"(https?://(?:[a-zA-Z0-9-]+\.)?mercadolivre\.com\.br/[^\s]+|https?://mercadolivre\.com/[^\s]+|https?://[a-zA-Z0-9-]+\.mercadolibre\.com/[^\s]+)"
+# Regex unificada abrangendo Mercado Livre, Shopee, Amazon e AliExpress
+REGEX_PROMO = r"(https?://(?:[a-zA-Z0-9-]+\.)?mercadolivre\.com\.br/[^\s]+|https?://mercadolivre\.com/[^\s]+|https?://[a-zA-Z0-9-]+\.mercadolibre\.com/[^\s]+|https?://meli\.la/[^\s]+|https?://(?:[a-zA-Z0-9-]+\.)?shope\.ee/[^\s]+|https?://s\.shopee\.com\.br/[^\s]+|https?://amzn\.to/[^\s]+|https?://(?:[a-zA-Z0-9-]+\.)?amazon\.com\.br/[^\s]+|https?://(?:[a-zA-Z0-9-]+\.)?aliexpress\.com/[^\s]+|https?://a\.aliexpress\.com/[^\s]+|https?://s\.click\.aliexpress\.com/[^\s]+)"
 
-@client.on(events.NewMessage(chats=CANAIS_ORIGEM))
+# Registra o momento exato em que o bot ligou para ignorar mensagens retroativas
+TEMPO_INICIO = datetime.now(timezone.utc)
+
+@client.on(events.NewMessage(chats=CANAIS_ORIGEM, incoming=True))
 async def processar_mensagem(event):
-    texto_original = event.message.text
+    # Ignora mensagens anteriores à inicialização do bot
+    if event.message.date < TEMPO_INICIO:
+        return
+
+    # Pega o texto ou a legenda da mensagem (caso venha com foto)
+    texto_original = event.message.text or event.message.caption
     if not texto_original:
         return
 
-    # Procura por links do Mercado Livre no texto da mensagem
-    links_encontrados = re.findall(REGEX_ML, texto_original)
+    # Procura por links suportados
+    links_encontrados = re.findall(REGEX_PROMO, texto_original)
 
     if not links_encontrados:
         return
 
-    print(f"\n📩 Nova oferta recebida! Encontrado(s) {len(links_encontrados)} link(s) do ML.")
+    print(f"\n📩 Nova oferta recebida de {event.chat_id}! Encontrado(s) {len(links_encontrados)} link(s) compatíveis.")
 
     texto_final = texto_original
 
-    # Garante que o access_token do ML esteja valido antes de processar
-    try:
-        ml_service.renovar_token()
-    except Exception as e:
-        print(f"⚠️ Erro ao renovar token do ML: {e}")
-        return
-
-    # Substitui cada link original pelo seu link encurtado/gerado de afiliado
+    # Substitui cada link original pelo seu respectivo link de afiliado
     for link in links_encontrados:
         try:
-            # Chama o metodo de conversao da sua classe MercadoLivreService
-            link_afiliado = ml_service.gerar_link_afiliado(link)
-            texto_final = texto_final.replace(link, link_afiliado)
-            print(f"✅ Link convertido com sucesso!")
+            link_afiliado = None
+            
+            # Identifica a plataforma e aciona o serviço correspondente
+            if "mercadolivre" in link or "meli.la" in link:
+                ml_service.renovar_token()
+                link_afiliado = await ml_service.gerar_link_afiliado(link)
+            elif "shope.ee" in link or "s.shopee.com.br" in link:
+                link_afiliado = await shopee_service.gerar_link_afiliado(link)
+            elif "amzn.to" in link or "amazon.com.br" in link:
+                link_afiliado = await amazon_service.gerar_link_afiliado(link)
+            elif "aliexpress.com" in link or "a.aliexpress.com" in link or "s.click.aliexpress.com" in link:
+                link_afiliado = await aliexpress_service.gerar_link_afiliado(link)
+
+            if link_afiliado:
+                texto_final = texto_final.replace(link, link_afiliado)
+                print(f"✅ Link convertido com sucesso!")
+            else:
+                print(f"⚠️ A conversão retornou vazio para o link: {link}")
         except Exception as e:
             print(f"❌ Erro ao converter o link {link}: {e}")
 
@@ -82,9 +103,10 @@ async def processar_mensagem(event):
         print(f"❌ Erro ao enviar mensagem para o canal destino: {e}")
 
 async def main():
-    print("🤖 Iniciando o Bot Promo...")
+    print("🤖 Iniciando o Bot Promo (Mercado Livre + Shopee + Amazon + AliExpress)...")
     await client.start()
-    print(f"⚡ Bot online e escutando os canais: {', '.join(str(c) for c in CANAIS_ORIGEM)}")
+    print(f"⚡ Bot online e escutando os {len(CANAIS_ORIGEM)} canais de origem.")
+    print("⏳ Aguardando novas postagens em tempo real...")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":
