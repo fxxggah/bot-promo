@@ -8,6 +8,7 @@ from ml_service import MercadoLivreService
 from shopee_service import ShopeeService
 from amazon_service import AmazonService
 from aliexpress_service import AliExpressService
+from kabum_service import KabumService
 
 # Carrega as variáveis do arquivo .env
 load_dotenv()
@@ -34,10 +35,11 @@ ml_service = MercadoLivreService()
 shopee_service = ShopeeService()
 amazon_service = AmazonService()
 aliexpress_service = AliExpressService()
+kabum_service = KabumService()
 client = TelegramClient("sessao_botpromo", API_ID, API_HASH)
 
 # Regex unificada abrangendo Mercado Livre, Shopee, Amazon e AliExpress
-REGEX_PROMO = r"(https?://(?:[a-zA-Z0-9-]+\.)?mercadolivre\.com\.br/[^\s]+|https?://mercadolivre\.com/[^\s]+|https?://[a-zA-Z0-9-]+\.mercadolibre\.com/[^\s]+|https?://meli\.la/[^\s]+|https?://(?:[a-zA-Z0-9-]+\.)?shope\.ee/[^\s]+|https?://s\.shopee\.com\.br/[^\s]+|https?://amzn\.to/[^\s]+|https?://(?:[a-zA-Z0-9-]+\.)?amazon\.com\.br/[^\s]+|https?://(?:[a-zA-Z0-9-]+\.)?aliexpress\.com/[^\s]+|https?://a\.aliexpress\.com/[^\s]+|https?://s\.click\.aliexpress\.com/[^\s]+)"
+REGEX_PROMO = r"(https?://(?:[a-zA-Z0-9-]+\.)?mercadolivre\.com\.br/[^\s]+|https?://mercadolivre\.com/[^\s]+|https?://[a-zA-Z0-9-]+\.mercadolibre\.com/[^\s]+|https?://meli\.la/[^\s]+|https?://(?:[a-zA-Z0-9-]+\.)?shope\.ee/[^\s]+|https?://s\.shopee\.com\.br/[^\s]+|https?://amzn\.to/[^\s]+|https?://(?:[a-zA-Z0-9-]+\.)?amazon\.com\.br/[^\s]+|https?://(?:[a-zA-Z0-9-]+\.)?aliexpress\.com/[^\s]+|https?://a\.aliexpress\.com/[^\s]+|https?://s\.click\.aliexpress\.com/[^\s]+|https?://(?:[a-zA-Z0-9-]+\.)?kabum\.com\.br/[^\s]+)"
 
 # Registra o momento exato em que o bot ligou para ignorar mensagens retroativas
 TEMPO_INICIO = datetime.now(timezone.utc)
@@ -81,6 +83,8 @@ async def processar_mensagem(event):
                 link_afiliado = await amazon_service.gerar_link_afiliado(link)
             elif "aliexpress.com" in link or "a.aliexpress.com" in link or "s.click.aliexpress.com" in link:
                 link_afiliado = await aliexpress_service.gerar_link_afiliado(link)
+            elif "kabum.com.br" in link:
+                link_afiliado = await kabum_service.gerar_link_afiliado(link)
 
             if link_afiliado:
                 texto_final = texto_final.replace(link, link_afiliado)
