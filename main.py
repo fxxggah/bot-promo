@@ -120,7 +120,7 @@ async def processar_mensagem(event):
         print(f"❌ Erro ao enviar mensagem para o canal destino: {e}")
 
 async def main():
-    print("🤖 Iniciando o Bot Promo (Mercado Livre + Shopee + Amazon + AliExpress)...")
+    print("🤖 Iniciando o Bot Promo (Mercado Livre + Shopee + Amazon + AliExpress + Kabum)...")
     await client.start()
     print(f"⚡ Bot online e escutando os {len(CANAIS_ORIGEM)} canais de origem.")
     print("⏳ Aguardando novas postagens em tempo real...")
