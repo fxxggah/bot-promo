@@ -62,6 +62,9 @@ async def processar_mensagem(event):
     print(f"\n📩 Nova oferta recebida de {event.chat_id}! Encontrado(s) {len(links_encontrados)} link(s) compatíveis.")
 
     texto_final = texto_original
+    
+    # Variável de controle para barrar postagem caso algum link quebre
+    links_convertidos_com_sucesso = True
 
     # Substitui cada link original pelo seu respectivo link de afiliado
     for link in links_encontrados:
@@ -84,8 +87,18 @@ async def processar_mensagem(event):
                 print(f"✅ Link convertido com sucesso!")
             else:
                 print(f"⚠️ A conversão retornou vazio para o link: {link}")
+                links_convertidos_com_sucesso = False
+                break  # Cancela o processo dos demais links desta mensagem
+                
         except Exception as e:
             print(f"❌ Erro ao converter o link {link}: {e}")
+            links_convertidos_com_sucesso = False
+            break
+
+    # TRAVA PRINCIPAL: Se deu BO em qualquer link (app store, captcha), aborta o envio pro canal
+    if not links_convertidos_com_sucesso:
+        print("🚫 Postagem cancelada: O link falhou na conversão (bloqueio por Captcha, Google Play, etc). O bot não fará esta postagem.")
+        return
 
     # Reenvia a mensagem (com fotos/mídias se houver) para o seu canal
     try:

@@ -17,10 +17,17 @@ class ShopeeService:
             await page.goto(url_curta, timeout=30000, wait_until="domcontentloaded")
             await asyncio.sleep(3)
             url_final = page.url
+            
+            # TRAVA DE SEGURANÇA: Verifica se a Shopee bloqueou com Captcha ou Tela de Login
+            if "captcha" in url_final.lower() or "login" in url_final.lower() or "verify" in url_final.lower():
+                print(f"⚠️ Bloqueio detectado (Captcha/Login) ao abrir link curto: {url_final}")
+                return None
+                
             print(f"✅ URL real do produto Shopee capturada: {url_final}")
         except Exception as e:
             print(f"⚠️ Erro ao navegar pelo link curto da Shopee: {e}")
-            url_final = page.url
+            return None
+            
         return url_final
 
     async def gerar_link_afiliado(self, url_original: str) -> str:
@@ -41,6 +48,11 @@ class ShopeeService:
                     url_para_gerar = url_original
                     if "shope.ee" in url_original or "s.shopee.com.br" in url_original:
                         url_para_gerar = await self.expandir_link_curto(page, url_original)
+                        
+                        # Se o expansor retornou None (caiu no Captcha), aborta
+                        if not url_para_gerar:
+                            print("❌ Geração abortada: Link barrado pelo Captcha da Shopee.")
+                            return None
 
                     # 2. Vai para a página exata de link personalizado da Shopee
                     url_painel = "https://affiliate.shopee.com.br/offer/custom_link"
@@ -56,7 +68,7 @@ class ShopeeService:
                     textarea_selector = "textarea.ant-input"
                     await page.wait_for_selector(textarea_selector, state="visible", timeout=20000)
 
-                    # Injeta o link utilizando o setter nativo do React/Ant Design e despacha os eventos
+                    # Injeta o link utilizando o setter nativo
                     await page.evaluate(f"""
                         const textarea = document.querySelector('{textarea_selector}');
                         textarea.focus();
@@ -73,13 +85,11 @@ class ShopeeService:
                     await botao_obter.first.click()
                     print("✅ Botão 'Obter link' acionado com sucesso!")
 
-                    # Aguarda o painel processar e gerar o resultado na tela
                     print("⏳ Aguardando o painel gerar o link...")
                     await asyncio.sleep(3)
 
                     print("📋 Clicando no botão 'Copiar Link' e capturando...")
                     try:
-                        # Clica no botão exato "Copiar Link" que você mapeou
                         botao_copiar = page.locator("button.ant-btn-primary:has-text('Copiar Link')")
                         if await botao_copiar.count() > 0:
                             await botao_copiar.first.click()
@@ -88,7 +98,7 @@ class ShopeeService:
                     except Exception as clip_err:
                         print(f"⚠️ Erro ao capturar via clipboard do botão Copiar: {clip_err}")
 
-                    # Fallback caso o clipboard falhe: varre inputs readonly de saída
+                    # Fallback caso o clipboard falhe
                     if not link_afiliado or ("shope.ee" not in link_afiliado and "s.shopee.com.br" not in link_afiliado):
                         elementos = await page.locator("input[readonly], textarea[readonly]").all()
                         for el in elementos:
