@@ -31,10 +31,16 @@ class MercadoLivreService:
                 await asyncio.sleep(3)
             
             url_final = page.url
+            
+            # TRAVA DE SEGURANÇA: Evita links da Google Play Store ou fora do padrão
+            if "play.google.com" in url_final or "mercadolivre" not in url_final.lower():
+                print(f"⚠️ URL inválida detectada (App Store ou erro de redirecionamento): {url_final}")
+                return None
+                
             print(f"✅ URL real do produto capturada: {url_final}")
         except Exception as e:
-            print(f"⚠️ Erro ao navegar pelo link curto (mantendo original): {e}")
-            url_final = page.url
+            print(f"⚠️ Erro ao navegar pelo link curto: {e}")
+            return None
         
         return url_final
 
@@ -56,6 +62,11 @@ class MercadoLivreService:
                     url_para_gerar = url_original
                     if "meli.la" in url_original:
                         url_para_gerar = await self.expandir_link_curto(page, url_original)
+                        
+                        # Se o expansor retornou None (caiu na Play Store), aborta a geração
+                        if not url_para_gerar:
+                            print("❌ Geração abortada: Link original inválido.")
+                            return None
 
                     # PASSO 2: Vai para o painel de afiliados
                     url_painel_afiliados = "https://www.mercadolivre.com.br/afiliados/linkbuilder#hub"
@@ -105,7 +116,7 @@ class MercadoLivreService:
 
                     print("📋 Capturando o link gerado pelo campo ou botão de cópia...")
                     
-                    # Tenta ler diretamente de qualquer input/textarea readonly que contenha a estrutura de afiliado do ML
+                    # Tenta ler diretamente de qualquer input/textarea readonly
                     for _ in range(3):
                         textareas = await page.locator("textarea, input[readonly]").all()
                         for el in textareas:
@@ -117,7 +128,7 @@ class MercadoLivreService:
                             break
                         await asyncio.sleep(1)
 
-                    # Se não achou varrendo os inputs, tenta clicar no botão "Copiar" exato que você mandou e ler da área de transferência
+                    # Tenta ler do Clipboard se falhar o método acima
                     if not link_afiliado:
                         try:
                             print("🖱️ Tentando clicar no botão 'Copiar' via seletor específico...")
