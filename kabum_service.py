@@ -24,48 +24,56 @@ class KabumService:
                     
                     page = await context.new_page()
 
-                    # Substitua pela URL exata do painel onde você gera os links da KaBuM!
-                    url_painel = "https://URL_DO_SEU_PAINEL_DE_AFILIADO_KABUM"
-                    print(f"🌐 Acessando o painel da KaBuM!: {url_painel}")
+                    # Substitua pela URL exata do painel da Awin
+                    url_painel = "https://ui.awin.com/link-builder/br/awin/publisher/3002719"
+                    print(f"🌐 Acessando o painel da Awin (KaBuM!): {url_painel}")
                     await page.goto(url_painel, timeout=60000)
                     await asyncio.sleep(3)
 
                     # Verifica se precisa de login manual
                     if "login" in page.url:
-                        print("⚠️ Faça login na conta de afiliado da KaBuM! na aba do navegador...")
+                        print("⚠️ Faça login na conta da Awin na aba do navegador...")
                         await asyncio.sleep(15)
 
-                    print("🔍 Inserindo a URL no campo gerador...")
-                    # ATENÇÃO: Troque 'seletor_do_input' pelo CSS real da caixa de texto do painel
-                    input_selector = "seletor_do_input" 
-                    await page.wait_for_selector(input_selector, state="visible", timeout=20000)
+                    print("🔍 Procurando o campo 'Destination URL' pelos seletores exatos...")
+                    # Utiliza o atributo name="destinationUrl" fornecido por você (muito mais seguro)
+                    campo_destino = page.locator('input[name="destinationUrl"]')
+                    await campo_destino.wait_for(state="visible", timeout=20000)
+                    
+                    # Preenche o link original da oferta
+                    await campo_destino.fill(url_original)
+                    await asyncio.sleep(1)
 
-                    # Injeta o link
-                    await page.evaluate(f"""
-                        const input = document.querySelector('{input_selector}');
-                        input.focus();
-                        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                        nativeInputValueSetter.call(input, '{url_original}');
-                        input.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                        input.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                    """)
-                    await asyncio.sleep(1.5)
+                    print("🖱️ Clicando no botão 'Generate link'...")
+                    # Localiza o botão laranja exatamente pelo nome que está escrito nele
+                    botao_gerar = page.get_by_role("button", name="Generate link")
+                    await botao_gerar.click()
 
-                    print("🖱️ Clicando no botão de gerar link...")
-                    # ATENÇÃO: Troque 'seletor_do_botao_gerar' pelo CSS real do botão
-                    botao_gerar = page.locator("seletor_do_botao_gerar")
-                    await botao_gerar.first.click()
-
-                    print("⏳ Aguardando o painel gerar o link...")
-                    await asyncio.sleep(3)
+                    print("⏳ Aguardando o painel gerar o link na seção 'Seu Deeplink'...")
+                    await asyncio.sleep(3) # Tempo para a Awin processar
 
                     print("📋 Capturando o link gerado...")
-                    # ATENÇÃO: Troque 'seletor_do_input_resultado' pelo CSS real de onde o link final aparece
-                    resultado_selector = "seletor_do_input_resultado"
-                    elemento_resultado = await page.locator(resultado_selector).first
-                    link_afiliado = await elemento_resultado.get_attribute("value")
+                    # Na Awin, o link gerado costuma aparecer em um input ou caixa de texto que permite cópia
+                    # Vamos tentar pegar o valor do primeiro input que aparece na tela após clicar em gerar
+                    
+                    link_afiliado = None
+                    inputs = await page.locator("input[type='text']").all()
+                    if inputs:
+                        # Pega o valor do último input de texto da página (geralmente é o resultado da Awin)
+                        link_afiliado = await inputs[-1].get_attribute("value")
+                    
+                    # Fallback de segurança: se o método acima falhar, tenta pegar do clipboard se houver botão de copiar
+                    if not link_afiliado or link_afiliado == url_original:
+                        try:
+                            botao_copiar = page.locator("button:has-text('Copiar'), button:has-text('Copy')")
+                            if await botao_copiar.count() > 0:
+                                await botao_copiar.first.click()
+                                await asyncio.sleep(1)
+                                link_afiliado = await page.evaluate("navigator.clipboard.readText()")
+                        except Exception:
+                            pass
 
-                    print(f"✅ Link KaBuM! gerado final: {link_afiliado}")
+                    print(f"✅ Link KaBuM! (Awin) gerado final: {link_afiliado}")
 
                 except Exception as e:
                     print(f"❌ Erro no Playwright para KaBuM!: {e}")
