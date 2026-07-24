@@ -63,8 +63,13 @@ async def processar_mensagem(event):
 
     print(f"\n📩 Nova oferta recebida de {event.chat_id}! Encontrado(s) {len(links_encontrados)} link(s) compatíveis.")
 
+    # Início das alterações no texto
     texto_final = texto_original
     
+    # 🌟 NOVO: Substitui links de outros canais do Telegram pelo seu
+    LINK_DO_SEU_CANAL = "https://t.me/cacaofertasbtu"
+    texto_final = re.sub(r"https?://t\.me/\S+", LINK_DO_SEU_CANAL, texto_final)
+
     # Variável de controle para barrar postagem caso algum link quebre
     links_convertidos_com_sucesso = True
 
@@ -121,10 +126,27 @@ async def processar_mensagem(event):
 
 async def main():
     print("🤖 Iniciando o Bot Promo (Mercado Livre + Shopee + Amazon + AliExpress + Kabum)...")
-    await client.start()
-    print(f"⚡ Bot online e escutando os {len(CANAIS_ORIGEM)} canais de origem.")
-    print("⏳ Aguardando novas postagens em tempo real...")
-    await client.run_until_disconnected()
+    
+    while True:
+        try:
+            if not client.is_connected():
+                print("⚡ Conectando ao Telegram...")
+                await client.start()
+                print(f"⚡ Bot online e escutando os {len(CANAIS_ORIGEM)} canais de origem.")
+                print("⏳ Aguardando novas postagens em tempo real...")
+            
+            await client.run_until_disconnected()
+        except (TimeoutError, ConnectionError, OSError) as net_err:
+            print(f"⚠️ Erro de conexão/timeout com o Telegram: {net_err}")
+            print("🔄 Tentando reconectar em 5 segundos...")
+            await asyncio.sleep(5)
+        except Exception as e:
+            print(f"⚠️ Ocorreu um erro inesperado: {e}")
+            print("🔄 Tentando reiniciar o ciclo em 10 segundos...")
+            await asyncio.sleep(10)
+        except KeyboardInterrupt:
+            print("\n🛑 Bot encerrado pelo usuário com sucesso.")
+            break
 
 if __name__ == "__main__":
     try:

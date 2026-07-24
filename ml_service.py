@@ -58,6 +58,17 @@ class MercadoLivreService:
                     
                     page = await context.new_page()
 
+                    # 🛡️ INÍCIO DO BLOQUEIO DE REDIRECIONAMENTO PARA APP STORES
+                    async def bloquear_app_stores(route):
+                        # Se a URL contiver domínios de lojas de app, aborta a requisição
+                        await route.abort()
+
+                    # Aplica a regra de bloqueio para Google Play e Apple Store
+                    await page.route("**/*play.google.com*", bloquear_app_stores)
+                    await page.route("**/*itunes.apple.com*", bloquear_app_stores)
+                    await page.route("**/*apps.apple.com*", bloquear_app_stores)
+                    # 🛡️ FIM DO BLOQUEIO
+
                     # PASSO 1: Resolve o link curto
                     url_para_gerar = url_original
                     if "meli.la" in url_original:
